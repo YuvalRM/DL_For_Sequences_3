@@ -141,13 +141,6 @@ if __name__ == "__main__":
     X, y = get_X_y()
     X_train, X_test, y_train, y_test = split_dataset(X, y, 0.8, 0.2)
 
-    train_loader = DataLoader(
-        TensorDataset(X_train, y_train), batch_size=batch_size, shuffle=True
-    )
-    test_loader = DataLoader(
-        TensorDataset(X_test, y_test), batch_size=batch_size, shuffle=True
-    )
-
     trainer = LstmTrainer()
 
     model = trainer.train(X, y)

@@ -30,16 +30,14 @@ def generate_negative_example():
             f"{generate_sequence(['d'])}" + \
             f"{generate_sequence(digits)}"
 def generate_examples(num_examples=500):
-    positive_examples = [generate_positive_example() for _ in range(num_examples)]
-    negative_examples = [generate_negative_example() for _ in range(num_examples)]
 
     with open('pos_examples', 'w') as pos_file:
-        for example in positive_examples:
-            pos_file.write(example + '\n')
+        for _ in range(num_examples):
+            pos_file.write(generate_positive_example() + '\n')
 
     with open('neg_examples', 'w') as neg_file:
-        for example in negative_examples:
-            neg_file.write(example + '\n')
+        for _ in range(num_examples):
+            neg_file.write(generate_negative_example() + '\n')
 
 
 
