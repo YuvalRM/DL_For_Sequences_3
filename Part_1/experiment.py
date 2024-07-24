@@ -10,9 +10,9 @@ epochs = 100
 char_embed_size = 10
 hidden_size1 = 100
 hidden_size2 = 50
-num_char_embedding = 3
-pos_examples_file = 'pos_examples3'
-neg_examples_file = 'neg_examples3'
+num_char_embedding = 14
+pos_examples_file = 'pos_examples'
+neg_examples_file = 'neg_examples'
 
 
 def get_char_to_idx():
