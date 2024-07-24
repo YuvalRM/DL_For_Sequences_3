@@ -1,6 +1,5 @@
 import random
 import string
-import torch
 
 
 def generate_sequence(chars):

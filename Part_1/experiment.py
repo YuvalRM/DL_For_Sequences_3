@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -97,6 +99,8 @@ class LstmTrainer:
         self.criterion = torch.nn.CrossEntropyLoss()
         best_val_loss = torch.inf
 
+        time = datetime.now()
+
         for epoch in range(self.epochs):
             self.model.train()
             train_loss = 0.0
@@ -119,6 +123,9 @@ class LstmTrainer:
             print(
                 'Epoch: {}, Train loss: {:5f}, Val loss: {:5f}, Val accuracy: {:5f}'.format(epoch, train_loss, val_loss,
                                                                                             val_accuracy))
+
+        print(f'Training time: {datetime.now() - time}')
+
         self.model.load_state_dict(torch.load('best_model.pth'))
         return self.model
 
@@ -146,7 +153,7 @@ class LstmTrainer:
         return accuracy
 
     def get_train_val_loaders(self, X, y):
-        X_train, X_val, y_train, y_val = split_dataset(X, y, 0.8, 0.2)
+        X_train, X_val, y_train, y_val = split_dataset(X, y, 0.9, 1/9)
 
         train_loader = DataLoader(
             TensorDataset(X_train, y_train), batch_size=batch_size, shuffle=True
@@ -160,9 +167,9 @@ class LstmTrainer:
 
 if __name__ == "__main__":
     X, y = get_dataset()
-    X_train, X_test, y_train, y_test = split_dataset(X, y, 0.8, 0.2)
+    X_train, X_test, y_train, y_test = split_dataset(X, y, 0.9, 0.1)
 
     trainer = LstmTrainer()
 
-    model = trainer.train(X, y)
+    model = trainer.train(X_train, y_train)
     trainer.test(X_test, y_test)
