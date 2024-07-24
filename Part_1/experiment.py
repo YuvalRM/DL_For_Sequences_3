@@ -10,6 +10,9 @@ epochs = 100
 char_embed_size = 10
 hidden_size1 = 100
 hidden_size2 = 50
+num_char_embedding = 3
+pos_examples_file = 'pos_examples3'
+neg_examples_file = 'neg_examples3'
 
 
 def get_char_to_idx():
@@ -20,9 +23,9 @@ def get_char_to_idx():
 
 def get_dataset():
     char_to_idx = get_char_to_idx()
-    with open('pos_examples', 'r') as pos_file:
+    with open(pos_examples_file, 'r') as pos_file:
         pos_examples = pos_file.readlines()
-    with open('neg_examples', 'r') as neg_file:
+    with open(neg_examples_file, 'r') as neg_file:
         neg_examples = neg_file.readlines()
     examples = pos_examples + neg_examples
     labels = [1] * len(pos_examples) + [0] * len(neg_examples)
@@ -72,7 +75,7 @@ class LSTM(torch.nn.Module):
 class LstmTrainer:
 
     def __init__(self, epochs=100, char_embed_size=10, hidden_size1=100, hidden_size2=50, num_layers=1, batch_size=32,
-                 lr=0.001):
+                 lr=0.001, num_char_embedding=14):
         self.epochs = epochs
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = None
@@ -83,6 +86,7 @@ class LstmTrainer:
         self.num_layers = num_layers
         self.batch_size = batch_size
         self.lr = lr
+        self.num_char_embedding = num_char_embedding
 
     def train(
             self, X: torch.Tensor, y: torch.Tensor
@@ -93,7 +97,8 @@ class LstmTrainer:
         self.model = LSTM(char_embed_size=self.char_embed_size,
                           hidden_size1=self.hidden_size1,
                           hidden_size2=self.hidden_size2,
-                          batch_size=self.batch_size).to(self.device)
+                          batch_size=self.batch_size,
+                          num_char_embedding=self.num_char_embedding).to(self.device)
 
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -169,7 +174,15 @@ if __name__ == "__main__":
     X, y = get_dataset()
     X_train, X_test, y_train, y_test = split_dataset(X, y, 0.9, 0.1)
 
-    trainer = LstmTrainer()
+    trainer = LstmTrainer(
+        epochs=epochs,
+        char_embed_size=char_embed_size,
+        hidden_size1=hidden_size1,
+        hidden_size2=hidden_size2,
+        batch_size=batch_size,
+        lr=lr,
+        num_char_embedding=num_char_embedding
+    )
 
     model = trainer.train(X_train, y_train)
     trainer.test(X_test, y_test)
