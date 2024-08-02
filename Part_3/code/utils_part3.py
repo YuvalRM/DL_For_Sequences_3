@@ -1,182 +1,138 @@
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def load_labes(file_name):
-    f = open(file_name, 'r')
-    lines = f.readlines()
-    labes = {}
-    indexes = {}
-    i = 0
-    for line in lines:
-        line = line.strip()
-        x_y = line.split()
+def read_data(file_name, pad_token):
+    sentences, tags, prefixes, suffixes = [], [], [], []
+    max_len = 0
 
-        if len(x_y) == 2 and x_y[1] not in labes.keys():
-            labes[x_y[1]] = i
-            indexes[i] = x_y[1]
-            i += 1
-    f.close()
-    return labes, indexes
+    with open(file_name, "r", encoding="utf-8") as file:
+        data = file.readlines()
+        sentence, sentence_tags, sentence_prefixes, sentence_suffixes = [], [], [], []
 
+        # For each line in the file.
+        for line in data:
 
-def load_data(file_name, strat_token='<s>', end_token='</s>',default_label='POS'):
-    f = open(file_name, 'r')
-    lines = f.readlines()
-    data = []
-    data.append((strat_token, default_label))
-    data.append((strat_token, default_label))
-    for line in lines:
-        line = line.strip()
-        x_y = line.split()
+            # As long as the sentence isn't over.
+            if line != '\n':
 
-        if len(x_y) == 2:
-            data.append((x_y[0], x_y[1]))
-    f.close()
-    data.append((end_token,default_label))
-    data.append((end_token, default_label))
-    return data
+                word, tag = line.strip().split()
+                word = word.lower()
+                sentence.append(word)
+                sentence_tags.append(tag)
+                # For each word save its prefix and suffix.
+                sentence_prefixes.append(word[:3])
+                sentence_suffixes.append(word[-3:])
+
+            else:  # EOS
+                max_len = max(max_len, len(sentence))
+                sentences.append(sentence)
+                prefixes.append(sentence_prefixes)
+                suffixes.append(sentence_suffixes)
+                tags.append(sentence_tags)
+                sentence, sentence_tags, sentence_prefixes, sentence_suffixes = [], [], [], []
+
+    return sentences, prefixes, suffixes, tags, max_len
 
 
-def convert_data_to_fives(data):
-    new_data = []
-    for i in range(2, len(data) - 2):
-        num1 = data[i - 2][0]
-        num2 = data[i - 1][0]
-        num4 = data[i + 1][0]
-        num5 = data[2 + i][0]
-        num3 = data[i][0]
-        new_data.append((torch.tensor([num1, num2, num3, num4, num5]), data[i][1]))
-    return new_data
-
-
-def number_representation(w, w_to_i):
-    if all(ch.isdigit() or ch == '.' or ch == '+' or ch == '-' for ch in w):
-        pattern = ""
-
-        # Replace each character with 'DG'
-        for ch in w:
-            pattern += 'DG' if ch.isdigit() else ch
-
-        pattern = pattern if pattern in w_to_i else 'NNNUMMM'
-        return pattern
-
-    elif all(ch.isdigit() or ch == ',' for ch in w) and any(ch.isdigit() for ch in w):
-        return "NNNUMMM"
-
-    return None
-
-
-def convert_to_data(data_to_label, w_to_i, l_2_i, unknown_token='UUUNKKK'):
-    data = []
-    for w, l in data_to_label:
-        if w in w_to_i.keys():
-            index = w_to_i[w]
-        else:
-            if w.lower() in w_to_i.keys():
-                index = w_to_i[w.lower()]
+def rare_to_unknown(data, threshold=1, unknown_token='UUUNKKK'):
+    words_count = {}
+    count = 0
+    how_many = 0
+    for sentence in data:
+        for word in sentence:
+            count += 1
+            if word not in words_count.keys():
+                words_count[word] = 1
             else:
-                if number_representation(w, w_to_i) in w_to_i.keys():
-                    index = w_to_i[number_representation(w, w_to_i)]
-                else:
-                    index = w_to_i[unknown_token]
-        label_id = l_2_i[l]
-        data.append((index, label_id))
+                words_count[word] += 1
+
+    for sentence in data:
+        for i in range(len(sentence)):
+            if words_count[sentence[i]] <= threshold:
+                sentence[i] = unknown_token
+                how_many += 1
 
     return data
 
 
-def load_train(file_name, strat_token='<s>', end_token='</s>'):
-    f = open(file_name, 'r')
-    lines = f.readlines()
-    data = []
-    data.append(strat_token)
-    data.append(strat_token)
-    for line in lines:
-        line = line.strip()
-        x_y = line.split()
-
-        if len(x_y) >= 1 and (x_y[0]) != '\n':
-            data.append(x_y[0])
-    f.close()
-    data.append(end_token)
-    data.append(end_token)
-    return data
+def words_to_indexes(data, unknown_token='UUUNKKK', pad_token='PPPADDD', tags=False):
+    vocab = set()
+    for sentence in data:
+        for word in sentence:
+            vocab.add(word)
+    vocab.discard(unknown_token)
+    vocab.discard(pad_token)
+    vocab = sorted(vocab)
+    if not tags:
+        vocab = [pad_token, unknown_token] + vocab
+    word_index = {word: i for i, word in enumerate(vocab)}
+    index_word = {i: word for i, word in enumerate(vocab)}
+    return word_index, index_word
 
 
-def convert_to_test(train_data, w_to_i, unknown_token='UUUNKKK'):
-    data = []
-    for w in train_data:
-        if w in w_to_i.keys():
-            index = w_to_i[w]
-        else:
-            if w.lower() in w_to_i.keys():
-                index = w_to_i[w.lower()]
+def chars_to_indexes(data, unknown_token='UUUNKKK', pad_token='PPPADDD'):
+    vocab = set()
+    for sentence in data:
+        for word in sentence:
+            for char in word:
+                vocab.add(char)
+
+    vocab = sorted(vocab)
+    vocab = [pad_token, unknown_token] + vocab
+    ch_index = {ch: i for i, ch in enumerate(vocab)}
+    index_ch = {i: ch for i, ch in enumerate(vocab)}
+    return ch_index, index_ch
+
+
+def convert_data_to_indexes(data, word_2_i, unknown_token='UUUNKKK'):
+    n_data = []
+
+    for sentence in data:
+        n_sentence = []
+        for word in sentence:
+            if word in word_2_i.keys():
+                n_sentence.append(word_2_i[word])
             else:
-                if number_representation(w, w_to_i) in w_to_i.keys():
-                    index = w_to_i[number_representation(w, w_to_i)]
+                n_sentence.append(word_2_i[unknown_token])
+
+        n_data.append(n_sentence)
+    return n_data
+
+
+def convert_chars_to_indexes(data, char_2_i, unknown_token='UUUNKKK'):
+    n_data = []
+
+    for sentence in data:
+        n_sentence = []
+        for word in sentence:
+            n_word = []
+            for ch in word:
+                if ch in char_2_i.keys():
+                    n_word.append(char_2_i[ch])
                 else:
-                    index = w_to_i[unknown_token]
-        data.append(index, )
-
-    return data
-
-
-def convert_test_to_fives(data):
-    new_data = []
-    for i in range(2, len(data) - 2):
-        num1 = data[i - 2]
-        num2 = data[i - 1]
-        num4 = data[i + 1]
-        num5 = data[2 + i]
-        num3 = data[i]
-        new_data.append(torch.tensor([num1, num2, num3, num4, num5]))
-    return new_data
+                    n_word.append(char_2_i[unknown_token])
+            n_sentence.append(n_word)
+        n_data.append(n_sentence)
+    return n_data
 
 
-def create_dev_train(train_file, dev_file, test_file, w_to_i):
-    l_2_i, i_2_l = load_labes(train_file)
-
-    train_2_label = load_data(train_file,default_label=i_2_l[0])
-    dev_2_label = load_data(dev_file,default_label=i_2_l[0])
-
-    train_data = convert_to_data(train_2_label, w_to_i, l_2_i)
-    dev_data = convert_to_data(dev_2_label, w_to_i, l_2_i)
-    train_data = convert_data_to_fives(train_data)
-    dev_data = convert_data_to_fives(dev_data)
-
-    test_words = load_train(test_file)
-    test_data = convert_test_to_fives(convert_to_test(load_train(test_file), w_to_i))
-    return train_data, dev_data, test_data, l_2_i, i_2_l, test_words
+def pad_data(sentences, max_len, tags=False):
+    padded = np.zeros((len(sentences), max_len), dtype=int)
+    if tags:
+        padded -= 1
+    lengths = []
+    for i, sentence in enumerate(sentences):
+        padded[i, :len(sentence)] = sentence
+        lengths.append(len(sentence))
+    return padded, lengths
 
 
-def plot_values(values, y_label):
-    """
-    Plots the given values with 'Epochs' as the x-axis label and y_label as the y-axis label.
-
-    Args:
-    values (list): A list of values to plot.
-    y_label (str): The label for the y-axis.
-    """
-    # Generate the x values (epochs)
-    epochs = list(range(1, len(values) + 1))
-
-    # Create the plot
-    plt.figure(figsize=(10, 5))
-    plt.plot(epochs, values, marker='o', linestyle='-', color='b')
-
-    # Set the labels
-    plt.xlabel('Epochs')
-    plt.ylabel(y_label)
-
-    # Set the title
-    plt.title(f'{y_label} vs Epochs')
-
-    # Show the grid
-    plt.grid(True)
-
-    plt.savefig(fname=f"./{y_label}_part_3")
-
-    # Show the plot
-    plt.show()
+def pad_chars(data, max_len, max_word):
+    padded = np.zeros((len(data), max_len, max_word), dtype=int)
+    for i, sentence in enumerate(data):
+        for j, word in enumerate(sentence):
+            padded[i, j, :len(word)] = word
+    return padded
