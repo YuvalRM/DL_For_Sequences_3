@@ -1,23 +1,22 @@
-import os
 from Part_3.code.bilstmTrain import main
 import matplotlib.pyplot as plt
 
 print("Starting POS a")
-accs_a_POS = main('a', "Part_3/pos/train",
-                  "Part_3/Models/model.pt", "Part_3/pos/dev", "POS")
+accs_a_POS = main('a', "pos/train",
+                  "Models/model_pos_a.pt", "pos/dev", "POS")
 
 
 print("Starting POS b")
-accs_b_POS = main('b', 'Part_3/pos/train', 'Part_3/Models/model.pt',
-                  "Part_3/pos/dev", "POS")
+accs_b_POS = main('b', 'pos/train', 'Models/model_pos_b.pt',
+                  "pos/dev", "POS")
 
 print("Starting POS c")
-accs_c_POS = main('c', 'Part_3/pos/train', 'Part_3/Models/model.pt',
-                  "Part_3/pos/dev", "POS")
+accs_c_POS = main('c', 'pos/train', 'Models/model_pos_c.pt',
+                  "pos/dev", "POS")
 
 print("Starting POS d")
-accs_d_POS = main('d', 'Part_3/pos/train', 'Part_3/Models/model.pt',
-                  "Part_3/pos/dev", "POS")
+accs_d_POS = main('d', 'pos/train', 'Models/model_pos_d.pt',
+                  "pos/dev", "POS")
 x_a, y_a = zip(*accs_a_POS)
 x_b, y_b = zip(*accs_b_POS)
 x_c, y_c = zip(*accs_c_POS)
@@ -39,14 +38,14 @@ plt.savefig('pos.jpg', format='jpg', dpi=300)
 plt.grid(True)
 plt.show()
 
-accs_a_NER = main('a', 'Part_3/ner/train',
-                  "Part_3/Models/model.pt", "Part_3/ner/dev", "NER")
-accs_b_NER = main('b', 'Part_3/ner/train',
-                  "Part_3/Models/model.pt", "Part_3/ner/dev", "NER")
-accs_c_NER = main('c', 'Part_3/ner/train',
-                  "Part_3/Models/model.pt", "Part_3/ner/dev", "NER")
-accs_d_NER = main('d', 'Part_3/ner/train',
-                  "Part_3/Models/model.pt", "Part_3/ner/dev", "NER")
+accs_a_NER = main('a', 'ner/train',
+                  "Models/model_ner_a.pt", "ner/dev", "NER")
+accs_b_NER = main('b', 'ner/train',
+                  "Models/model_ner_b.pt", "ner/dev", "NER")
+accs_c_NER = main('c', 'ner/train',
+                  "Models/model_ner_c.pt", "ner/dev", "NER")
+accs_d_NER = main('d', 'ner/train',
+                  "Models/model_ner_d.pt", "ner/dev", "NER")
 
 
 x_a, y_a = zip(*accs_a_NER)
