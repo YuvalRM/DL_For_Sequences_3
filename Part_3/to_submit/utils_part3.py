@@ -36,6 +36,39 @@ def read_data(file_name, pad_token):
 
     return sentences, prefixes, suffixes, tags, max_len
 
+def read_data_for_pred(file_name, pad_token):
+    sentences, tags, prefixes, suffixes,regular_sentences = [], [], [], [],[]
+    max_len = 0
+
+    with open(file_name, "r", encoding="utf-8") as file:
+        data = file.readlines()
+        sentence, sentence_tags, sentence_prefixes, sentence_suffixes,regular_sentence = [], [], [], [],[]
+
+        # For each line in the file.
+        for line in data:
+
+            # As long as the sentence isn't over.
+            if line != '\n':
+
+                word = line.strip().split()[0]
+                regular_sentence.append(word)
+                word = word.lower()
+                sentence.append(word)
+                # For each word save its prefix and suffix.
+                sentence_prefixes.append(word[:3])
+                sentence_suffixes.append(word[-3:])
+
+            else:  # EOS
+                max_len = max(max_len, len(sentence))
+                sentences.append(sentence)
+                prefixes.append(sentence_prefixes)
+                suffixes.append(sentence_suffixes)
+                tags.append(sentence_tags)
+                regular_sentences.append(regular_sentence)
+                sentence, sentence_tags, sentence_prefixes, sentence_suffixes,regular_sentence = [], [], [], [],[]
+
+    return sentences, prefixes, suffixes, tags, max_len,regular_sentences
+
 
 def rare_to_unknown(data, threshold=1, unknown_token='UUUNKKK'):
     words_count = {}

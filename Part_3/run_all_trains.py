@@ -1,4 +1,4 @@
-from Part_3.code.bilstmTrain import main
+from Part_3.to_submit.bilstmTrain import main
 import matplotlib.pyplot as plt
 
 print("Starting POS a")

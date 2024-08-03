@@ -2,8 +2,9 @@ import copy
 from torch.utils.data import TensorDataset, DataLoader
 from torch import nn
 import sys
-from Part_3.code.utils_part3 import *
+from Part_3.to_submit.utils_part3 import *
 import os
+import json
 
 """HYPER PARAMETERS"""
 
@@ -244,7 +245,7 @@ def main(repr, train_file, model_file, dev_file, task):
                                      torch.LongTensor(dev_lengths))
         dev_data = DataLoader(dev_data_set, batch_size=BATCH_SIZE, shuffle=False)
 
-    model = LSTM_Model(len(words_i.keys()), len(prefixes_i), len(suffixes_i), HIDDEN_LAYER, len(tags_i),
+    model = LSTM_Model(len(words_i), len(prefixes_i), len(suffixes_i), HIDDEN_LAYER, len(tags_i),
                        embed_dim=EMBED_DIM, repr=repr, num_chars=len(chars_i),
                        char_embed_dim=CHAR_EMBBED_DIM, special_dim=SPECIAL_DIM)
 
@@ -256,7 +257,12 @@ def main(repr, train_file, model_file, dev_file, task):
     train_data_set = TensorDataset(torch.LongTensor(sentences), torch.LongTensor(prefixes), torch.LongTensor(suffixes),
                                    torch.LongTensor(chars), torch.LongTensor(tags), torch.LongTensor(lengths))
     train_data = DataLoader(train_data_set, batch_size=BATCH_SIZE, shuffle=True)
-
+    model_params = {"WORDS_2_i": words_i, "PREFIXES_2_i": prefixes_i, "SUFFIXES_2_i": suffixes_i,
+                    "HIDDEN_LAYER": HIDDEN_LAYER, "TAGS_2_i": tags_i, "i_2_TAGS": i_tags, "EMBED_DIM": EMBED_DIM,
+                    "CHARS_2_i": chars_i, "CHAR_EMBBED_DIM": CHAR_EMBBED_DIM, "SPECIAL_DIM": SPECIAL_DIM,
+                    "UNKNOWN_TOKEN": UNKNOWN_TOKEN, "PAD_TOKEN": PAD_TOKEN}
+    with open(model_file + ".json", "w") as f:
+        json.dump(model_params, f, indent=4)
     accs = train(model, train_data, dev_data, optimizer, task, tags_i, model_file)
 
     return accs
