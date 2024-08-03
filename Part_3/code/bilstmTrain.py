@@ -144,7 +144,7 @@ def check_accuracy(loader, model, task, tags):
     return (correct / total)
 
 
-def train(model, data_loader, dev_data_loader, optimizer, task, tags_i,model_file):
+def train(model, data_loader, dev_data_loader, optimizer, task, tags_i, model_file):
     model.to(device)
     loss_f = nn.CrossEntropyLoss(ignore_index=-1).to(device)
     model.train()
@@ -159,13 +159,11 @@ def train(model, data_loader, dev_data_loader, optimizer, task, tags_i,model_fil
         for batch_idx, batch in enumerate(data_loader):
 
             sentences_done += BATCH_SIZE
-            if sentences_done % 500 < BATCH_SIZE:
-                accs.append([check_accuracy(dev_data_loader, model, task, tags_i), sentences_done])
-            if batch_idx == 0:
-                print(check_accuracy(dev_data_loader, model, task, tags_i))
-
-
-
+            if dev_data_loader:
+                if sentences_done % 500 < BATCH_SIZE:
+                    accs.append([check_accuracy(dev_data_loader, model, task, tags_i), sentences_done])
+                if batch_idx == 0:
+                    print(check_accuracy(dev_data_loader, model, task, tags_i))
 
             optimizer.zero_grad()
             inputs, prefixes, suffixes, chars, labels, lengths = batch
@@ -190,10 +188,11 @@ def train(model, data_loader, dev_data_loader, optimizer, task, tags_i,model_fil
             #total += mask.sum().item()
         torch.save(model.state_dict(), model_file)
 
-
         #print(f"train acc is: {correct / total}")
     return accs
-def main(repr,train_file,model_file,dev_file,task):
+
+
+def main(repr, train_file, model_file, dev_file, task):
     """TRAIN DATA SET"""
 
     sentences, prefixes, suffixes, tags, max_len_sentence = read_data(train_file, PAD_TOKEN)
@@ -223,20 +222,27 @@ def main(repr,train_file,model_file,dev_file,task):
     chars = pad_chars(chars, max_len_sentence, MAX_WORD_LEN)
 
     """DEV DATA SET"""
-    dev_sentences, dev_prefixes, dev_suffixes, dev_tags, dev_max_len_sentence = read_data(dev_file, PAD_TOKEN)
+    dev_data = None
+    if dev_file != None:
+        dev_sentences, dev_prefixes, dev_suffixes, dev_tags, dev_max_len_sentence = read_data(dev_file, PAD_TOKEN)
 
-    dev_chars = convert_chars_to_indexes(copy.deepcopy(dev_sentences), chars_i, unknown_token=UNKNOWN_TOKEN)
+        dev_chars = convert_chars_to_indexes(copy.deepcopy(dev_sentences), chars_i, unknown_token=UNKNOWN_TOKEN)
 
-    dev_sentences = convert_data_to_indexes(dev_sentences, words_i, unknown_token=UNKNOWN_TOKEN)
-    dev_prefixes = convert_data_to_indexes(dev_prefixes, prefixes_i, unknown_token=UNKNOWN_TOKEN)
-    dev_suffixes = convert_data_to_indexes(dev_suffixes, suffixes_i, unknown_token=UNKNOWN_TOKEN)
-    dev_tags = convert_data_to_indexes(dev_tags, tags_i, unknown_token=UNKNOWN_TOKEN)
+        dev_sentences = convert_data_to_indexes(dev_sentences, words_i, unknown_token=UNKNOWN_TOKEN)
+        dev_prefixes = convert_data_to_indexes(dev_prefixes, prefixes_i, unknown_token=UNKNOWN_TOKEN)
+        dev_suffixes = convert_data_to_indexes(dev_suffixes, suffixes_i, unknown_token=UNKNOWN_TOKEN)
+        dev_tags = convert_data_to_indexes(dev_tags, tags_i, unknown_token=UNKNOWN_TOKEN)
 
-    dev_sentences, dev_lengths = pad_data(dev_sentences, max_len_sentence)
-    dev_prefixes, _ = pad_data(dev_prefixes, max_len_sentence)
-    dev_suffixes, _ = pad_data(dev_suffixes, max_len_sentence)
-    dev_tags, _ = pad_data(dev_tags, max_len_sentence, tags=True)
-    dev_chars = pad_chars(dev_chars, max_len_sentence, MAX_WORD_LEN)
+        dev_sentences, dev_lengths = pad_data(dev_sentences, max_len_sentence)
+        dev_prefixes, _ = pad_data(dev_prefixes, max_len_sentence)
+        dev_suffixes, _ = pad_data(dev_suffixes, max_len_sentence)
+        dev_tags, _ = pad_data(dev_tags, max_len_sentence, tags=True)
+        dev_chars = pad_chars(dev_chars, max_len_sentence, MAX_WORD_LEN)
+        dev_data_set = TensorDataset(torch.LongTensor(dev_sentences), torch.LongTensor(dev_prefixes),
+                                     torch.LongTensor(dev_suffixes),
+                                     torch.LongTensor(dev_chars), torch.LongTensor(dev_tags),
+                                     torch.LongTensor(dev_lengths))
+        dev_data = DataLoader(dev_data_set, batch_size=BATCH_SIZE, shuffle=False)
 
     model = LSTM_Model(len(words_i.keys()), len(prefixes_i), len(suffixes_i), HIDDEN_LAYER, len(tags_i),
                        embed_dim=EMBED_DIM, repr=repr, num_chars=len(chars_i),
@@ -245,23 +251,15 @@ def main(repr,train_file,model_file,dev_file,task):
     if os.path.isfile(model_file):
         model.load_state_dict(torch.load(model_file))
 
-
-
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 
     train_data_set = TensorDataset(torch.LongTensor(sentences), torch.LongTensor(prefixes), torch.LongTensor(suffixes),
                                    torch.LongTensor(chars), torch.LongTensor(tags), torch.LongTensor(lengths))
     train_data = DataLoader(train_data_set, batch_size=BATCH_SIZE, shuffle=True)
 
-    dev_data_set = TensorDataset(torch.LongTensor(dev_sentences), torch.LongTensor(dev_prefixes),
-                                 torch.LongTensor(dev_suffixes),
-                                 torch.LongTensor(dev_chars), torch.LongTensor(dev_tags), torch.LongTensor(dev_lengths))
-    dev_data = DataLoader(dev_data_set, batch_size=BATCH_SIZE, shuffle=False)
+    accs = train(model, train_data, dev_data, optimizer, task, tags_i, model_file)
 
-    accs = train(model, train_data, dev_data, optimizer, task, tags_i,model_file)
-
-
-    return  accs
+    return accs
 
 
 if __name__ == '__main__':
@@ -269,8 +267,14 @@ if __name__ == '__main__':
     repr = args[1]
     train_file = args[2]
     model_file = args[3]
-    dev_file = args[4]
-    task = args[5]
+    if len(sys.argv) > 4:
+        dev_file = args[4]
+    else:
+        dev_file = None
+    if len(sys.argv) > 5:
+        task = args[5]
+    else:
+        task = None
 
     assert repr in ['a', 'b', 'c', 'd']
 
